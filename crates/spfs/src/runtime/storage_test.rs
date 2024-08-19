@@ -4,6 +4,7 @@
 
 use std::fs::File;
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -707,6 +708,7 @@ async fn test_runtime_ensure_extra_bind_mount_locations_exist(tmpdir: tempfile::
     assert!(runtime.prepare_live_layers().await.is_ok())
 }
 
+#[cfg(unix)]
 #[rstest]
 fn test_makedirs_dont_change_existing(tmpdir: tempfile::TempDir) {
     let chkdir = tmpdir.path().join("my_dir");

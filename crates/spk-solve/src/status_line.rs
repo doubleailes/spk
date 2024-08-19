@@ -10,6 +10,16 @@ use crossterm::cursor::{MoveTo, RestorePosition, SavePosition};
 use crossterm::style::Print;
 use crossterm::terminal::{self, Clear, ClearType, ScrollUp};
 use crossterm::{csi, queue, Command, QueueableCommand};
+#[cfg(windows)]
+use std::thread;
+#[cfg(windows)]
+use crossterm::terminal::size;
+#[cfg(windows)]
+use crossterm::execute;
+#[cfg(windows)]
+use std::io::stdout;
+#[cfg(windows)]
+use std::time::Duration;
 
 use crate::{Error, Result};
 
@@ -20,6 +30,9 @@ impl Command for ScrollRegion {
     fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
         write!(f, csi!("{};{}r"), self.0 + 1, self.1 + 1)
     }
+    fn execute_winapi(&self) -> std::result::Result<(), std::io::Error> {
+        todo!()
+    }
 }
 
 /// Reset the terminal scroll region to the entire screen.
@@ -28,6 +41,9 @@ struct ResetScrollRegion;
 impl Command for ResetScrollRegion {
     fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
         write!(f, csi!("r"))
+    }
+    fn execute_winapi(&self) -> std::result::Result<(), std::io::Error> {
+        todo!()
     }
 }
 
@@ -40,6 +56,24 @@ pub(crate) struct StatusLine {
     sig_winch_tripped: Arc<AtomicBool>,
 }
 
+#[cfg(windows)]
+fn monitor_terminal_size(sig_winch_tripped: Arc<AtomicBool>) {
+    thread::spawn(move || {
+        let mut last_size = size().unwrap();
+        loop {
+            let current_size = size().unwrap();
+            if current_size != last_size {
+                sig_winch_tripped.store(true, Ordering::SeqCst);
+                last_size = current_size;
+                // Optionally clear the terminal or handle the resize event
+                let mut stdout = stdout();
+                execute!(stdout, Clear(ClearType::All)).unwrap();
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
+}
+
 impl StatusLine {
     pub(crate) fn flush(&mut self) -> Result<()> {
         self.stdout.flush().map_err(Error::StatusBarIOError)
@@ -49,10 +83,13 @@ impl StatusLine {
         // Monitor SIGWINCH to know when the terminal has been resized,
         // to update our saved dimensions.
         let sig_winch_tripped = Arc::new(AtomicBool::new(false));
+        #[cfg(unix)]
         let _ = signal_hook::flag::register(
             signal_hook::consts::SIGWINCH,
             Arc::clone(&sig_winch_tripped),
         );
+        #[cfg(windows)]
+        monitor_terminal_size(Arc::clone(&sig_winch_tripped));
 
         let (term_cols, term_rows) = terminal::size().map_err(Error::StatusBarIOError)?;
 

@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 use std::iter::FromIterator;
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::sync::Arc;
 
@@ -58,6 +59,7 @@ async fn test_find_aliases(
     assert_eq!(actual, expected);
 }
 
+#[cfg(unix)]
 #[rstest]
 #[tokio::test]
 async fn test_commit_mode_fs(tmpdir: tempfile::TempDir) {
@@ -109,6 +111,7 @@ async fn test_commit_mode_fs(tmpdir: tempfile::TempDir) {
     )
 }
 
+#[cfg(unix)]
 #[rstest]
 #[case::fs(tmprepo("fs"))]
 #[case::tar(tmprepo("tar"))]

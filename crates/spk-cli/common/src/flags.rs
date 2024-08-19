@@ -205,6 +205,72 @@ impl Runtime {
             .wrap_err("Failed to re-launch spk in an spfs runtime")?;
         unreachable!()
     }
+    #[cfg(target_os = "windows")]
+    pub fn relaunch_with_runtime(
+        &self,
+        no_runtime_arg_insertion_index: usize,
+    ) -> Result<spfs::runtime::Runtime> {
+        use std::process::Command;
+    
+        let args = std::env::args();
+    
+        let mut found_insertion_index = false;
+        let mut new_args = Vec::new();
+    
+        for (index, arg) in args.enumerate() {
+            if index == no_runtime_arg_insertion_index {
+                found_insertion_index = true;
+                new_args.push("--no-runtime".to_string());
+                new_args.push(arg);
+            } else {
+                new_args.push(arg);
+            }
+        }
+    
+        if !found_insertion_index {
+            new_args.push("--no-runtime".to_string());
+        }
+    
+        new_args.insert(0, "--".to_string());
+        new_args.insert(0, spfs::tracking::ENV_SPEC_EMPTY.to_string());
+    
+        if let Some(runtime_name) = &self.runtime_name {
+            new_args.insert(0, runtime_name.clone());
+            new_args.insert(0, "--name".to_string());
+        }
+    
+        if self.keep_runtime {
+            new_args.insert(0, "--keep-runtime".to_string());
+        }
+    
+        new_args.insert(0, "run".to_string());
+        new_args.insert(0, "spfs".to_string());
+    
+        tracing::debug!("relaunching under spfs");
+        tracing::trace!("{:?}", new_args);
+    
+        // Record the run duration up to this point because this spk
+        // command is about to replace itself with an identical spk
+        // command that is inside a spfs runtime. We want to capture
+        // the run time for the current spk run before it is replaced.
+        #[cfg(feature = "statsd")]
+        {
+            if let Some(statsd_client) = get_metrics_client() {
+                statsd_client.record_duration_from_start(&SPK_RUN_TIME_METRIC);
+            }
+        }
+    
+        let status = Command::new("spfs")
+            .args(&new_args)
+            .status()
+            .into_diagnostic()
+            .wrap_err("Failed to re-launch spk in an spfs runtime")?;
+    
+        if !status.success() {
+            return Err(miette::miette!("Process did not exit successfully"));
+        }
+        unreachable!()
+    }
 }
 
 #[derive(Args, Clone)]

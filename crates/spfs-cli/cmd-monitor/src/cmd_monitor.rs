@@ -12,7 +12,9 @@ use spfs::Error;
 use spfs_cli_common as cli;
 use spfs_cli_common::CommandName;
 use tokio::io::AsyncReadExt;
+#[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::windows::ctrl_c;
 use tokio::time::timeout;
 
 fn main() -> Result<()> {
@@ -86,11 +88,15 @@ impl CmdMonitor {
         rt.block_on(self.wait_for_ready());
         // clean up this runtime and all other threads before detaching
         drop(rt);
-
+        #[cfg(unix)]
         nix::unistd::daemon(self.no_chdir, self.no_close)
             .into_diagnostic()
             .wrap_err("Failed to daemonize the monitor process")?;
-
+        #[cfg(windows)]
+        {
+            // Windows does not have a daemonize function, so we just
+            // continue on with the process as normal.
+        }
         #[cfg(feature = "sentry")]
         {
             // Initialize sentry after the call to `daemon` so it is safe for
@@ -142,12 +148,27 @@ impl CmdMonitor {
     }
 
     pub async fn run_async(&mut self) -> Result<i32> {
+        #[cfg(unix)]
         let mut interrupt = signal(SignalKind::interrupt())
             .map_err(|err| Error::process_spawn_error("signal()", err, None))?;
+        #[cfg(unix)]
+        let interrupt = signal(SignalKind::interrupt())
+            .map_err(|err| Error::process_spawn_error("signal()", err, None))?;
+        #[cfg(windows)]
+        let mut interrupt = ctrl_c()
+            .map_err(|err| Error::process_spawn_error("ctrl_c()", err, None))?;
+        #[cfg(unix)]
         let mut quit = signal(SignalKind::quit())
             .map_err(|err| Error::process_spawn_error("signal()", err, None))?;
+        #[cfg(windows)]
+        let mut quit = ctrl_c()
+            .map_err(|err| Error::process_spawn_error("ctrl_c()", err, None))?;
+        #[cfg(unix)]
         let mut terminate = signal(SignalKind::terminate())
             .map_err(|err| Error::process_spawn_error("signal()", err, None))?;
+        #[cfg(windows)]
+        let mut terminate = ctrl_c()
+            .map_err(|err| Error::process_spawn_error("ctrl_c()", err, None))?;
 
         let repo = spfs::open_repository(&self.runtime_storage).await?;
         let storage = spfs::runtime::Storage::new(repo)?;

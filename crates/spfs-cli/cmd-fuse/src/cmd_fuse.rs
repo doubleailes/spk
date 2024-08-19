@@ -3,12 +3,15 @@
 // https://github.com/spkenv/spk
 
 use clap::Parser;
+#[cfg(unix)]
 use fuser::MountOption;
 use miette::{bail, miette, Context, IntoDiagnostic, Result};
 use spfs::tracking::EnvSpec;
 use spfs::Error;
 use spfs_cli_common as cli;
+#[cfg(unix)]
 use spfs_vfs::{Config, Session};
+#[cfg(unix)]
 use tokio::signal::unix::{signal, SignalKind};
 
 // The runtime setup process manages the current namespace
@@ -18,8 +21,10 @@ fn main() {
     // because this function exits right away it does not
     // properly handle destruction of data, so we put the actual
     // logic into a separate function/scope
+    #[cfg(unix)]
     std::process::exit(main2())
 }
+#[cfg(unix)]
 fn main2() -> i32 {
     let mut opt = CmdFuse::parse();
     opt.logging
@@ -103,6 +108,7 @@ impl cli::CommandName for CmdFuse {
 }
 
 impl CmdFuse {
+    #[cfg(unix)]
     pub fn run(&mut self, config: &spfs::Config) -> Result<i32> {
         let calling_uid = nix::unistd::geteuid();
         let calling_gid = nix::unistd::getegid();
@@ -288,6 +294,7 @@ impl CmdFuse {
 }
 
 /// Copies from the private [`fuser::MountOption::from_str`]
+#[cfg(unix)]
 fn parse_options_from_args(args: &[String]) -> Vec<MountOption> {
     args.iter()
         .map(|s| match s.as_str() {
