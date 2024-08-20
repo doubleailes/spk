@@ -74,13 +74,14 @@ impl HostOptions {
         opts.insert(OptName::os().to_owned(), std::env::consts::OS.into());
         opts.insert(OptName::arch().to_owned(), std::env::consts::ARCH.into());
 
+        #[cfg(unix)]
         let info = match sys_info::linux_os_release() {
             Ok(i) => i,
             Err(err) => {
                 return Err(Error::String(format!("Failed to get linux info: {err:?}")));
             }
         };
-
+        #[cfg(unix)]
         if let Some(id) = info.id {
             opts.insert(OptName::distro().to_owned(), id.clone());
             match OptNameBuf::try_from(id) {
@@ -94,7 +95,6 @@ impl HostOptions {
                 }
             }
         }
-
         Ok(opts)
     }
 

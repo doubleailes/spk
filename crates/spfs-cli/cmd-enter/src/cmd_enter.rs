@@ -243,12 +243,18 @@ impl CmdEnter {
         &mut self,
         config: &spfs::Config,
     ) -> Result<Option<spfs::runtime::OwnedRuntime>> {
-        let runtime = self.load_runtime(config).await?;
+        let mut runtime = self.load_runtime(config).await?;
         tracing::debug!("entering runtime: {runtime:#?}");
         if self.exit.enabled {
-            todo!()
+            let in_namespace =
+            spfs::env::RuntimeConfigurator::default().current_runtime(&runtime)?;
+            todo!("exit runtime");
+            Ok(None)
         } else if self.remount.enabled {
-            todo!()
+            let start_time = Instant::now();
+            let render_summary = spfs::reinitialize_runtime(&mut runtime).await?;
+            self.report_render_summary(render_summary, start_time.elapsed().as_secs_f64());
+            Ok(None)
         } else {
             let mut owned = spfs::runtime::OwnedRuntime::upgrade_as_owner(runtime).await?;
             let start_time = Instant::now();

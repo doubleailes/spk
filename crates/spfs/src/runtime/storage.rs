@@ -408,12 +408,11 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self::from_root(Path::new(Self::RUNTIME_DIR))
+        Self::from_root(Self::get_runtime_dir())
     }
 }
 
 impl Config {
-    const RUNTIME_DIR: &'static str = "/tmp/spfs-runtime";
     const UPPER_DIR: &'static str = "upper";
     const LOWER_DIR: &'static str = "lower";
     const WORK_DIR: &'static str = "work";
@@ -421,6 +420,10 @@ impl Config {
     const CSH_STARTUP_FILE: &'static str = ".cshrc";
     const PS_STARTUP_FILE: &'static str = "startup.ps1";
     const DEV_NULL: &'static str = "/dev/null";
+
+    fn get_runtime_dir()-> PathBuf {
+        temp_dir().join("spfs-runtime")
+    }
 
     /// Return a dummy value for the legacy csh_expect_file field.
     fn default_csh_expect_file() -> PathBuf {
